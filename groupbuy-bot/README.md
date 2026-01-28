@@ -57,15 +57,12 @@ cp .env.example .env
 # Edit .env with your settings
 ```
 
-3. Start the services:
+3. Start the services (migrations run automatically):
 ```bash
 docker-compose up -d
 ```
 
-4. Run database migrations:
-```bash
-docker-compose exec core python manage.py migrate
-```
+Note: Database migrations are applied automatically when the core service starts.
 
 5. Create admin user:
 ```bash
@@ -119,16 +116,47 @@ pytest ../tests/test_bot_commands.py
 
 ## Production Deployment
 
+### Single Server Deployment
+
 Use the production Docker Compose file:
 
 ```bash
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
+### Two-Server Deployment
+
+For high-load scenarios, the application supports a two-server architecture:
+- **Server 1 (Chat)**: Handles real-time WebSocket connections
+- **Server 2 (API/Bot)**: Handles business logic and data
+
+On Server 1 (Chat):
+```bash
+docker-compose -f docker-compose.two-server.yml up -d websocket-server redis-chat nginx-chat
+```
+
+On Server 2 (API):
+```bash
+docker-compose -f docker-compose.two-server.yml up -d core bot telegram-adapter postgres redis-api nginx-api
+```
+
+Configure `CORE_API_URL` on Server 1 to point to Server 2's API endpoint.
+
 ### SSL Configuration
 
 1. Place SSL certificates in `infrastructure/nginx/ssl/`
-2. Update nginx.conf to use HTTPS
+2. Update nginx configuration files to use HTTPS (uncomment SSL sections)
+
+## Web Frontend
+
+The application includes a Telegram-like web frontend accessible at the root URL (`/`).
+
+Features:
+- Responsive design matching Telegram's look and feel
+- Real-time chat via WebSocket
+- Personal cabinet for each role (Buyer, Organizer, Supplier)
+- Procurement browsing with horizontal slider
+- Dark/light theme support
 
 ## API Documentation
 
