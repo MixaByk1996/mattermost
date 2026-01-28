@@ -70,6 +70,17 @@ services:
     networks:
       - groupbuy-network
 
+  # React frontend
+  frontend-react:
+    build: ./frontend-react
+    ports:
+      - "3000:80"
+    depends_on:
+      - core
+      - websocket-server
+    networks:
+      - groupbuy-network
+
   # PostgreSQL database
   postgres:
     image: postgres:16-alpine
