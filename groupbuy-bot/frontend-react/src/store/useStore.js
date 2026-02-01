@@ -44,7 +44,8 @@ export const useStore = create((set, get) => ({
   register: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      const user = await api.registerUser({ ...data, platform: 'websocket' });
+      const platformUserId = `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const user = await api.registerUser({ ...data, platform: 'websocket', platform_user_id: platformUserId });
       localStorage.setItem('userId', user.id);
       set({ user, isLoading: false, loginModalOpen: false });
       get().loadProcurements();
