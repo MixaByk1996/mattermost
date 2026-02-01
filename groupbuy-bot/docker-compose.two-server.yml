@@ -1,14 +1,10 @@
 # Docker Compose configuration for Two-Server Deployment
 # Server 1: Chat service (WebSocket real-time messaging)
-# Server 2: Bot service with business logic and data
-#
-# This configuration splits the application across two servers:
-# - Server 1 (Chat): Handles real-time WebSocket chat, optimized for concurrent connections
-# - Server 2 (API/Bot): Handles business logic, bot commands, and data storage
+# Server 2: Bot service with business logic and data (Rust backend)
 #
 # Usage:
-# On Server 1 (Chat): docker-compose -f docker-compose.two-server.yml up chat-server redis-chat nginx-chat
-# On Server 2 (API):  docker-compose -f docker-compose.two-server.yml up core bot telegram-adapter postgres redis-api
+# On Server 1 (Chat): docker-compose -f docker-compose.two-server.yml up websocket-server redis-chat nginx-chat
+# On Server 2 (API):  docker-compose -f docker-compose.two-server.yml up core bot telegram-adapter postgres redis-api nginx-api
 
 version: '3.8'
 
@@ -17,7 +13,7 @@ services:
   # SERVER 1: Chat Services
   # ============================================
 
-  # WebSocket server for real-time chat
+  # WebSocket server for real-time chat (Python - to be migrated to Rust)
   websocket-server:
     build: ./infrastructure/websocket
     container_name: groupbuy-chat-server
@@ -76,31 +72,18 @@ services:
       - chat-network
 
   # ============================================
-  # SERVER 2: API and Bot Services
+  # SERVER 2: API and Bot Services (Rust Backend)
   # ============================================
 
-  # Core Django API (business logic and data)
+  # Core Rust API (business logic and data)
   core:
-    build: ./core
+    build: ./core-rust
     container_name: groupbuy-core-api
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4"
     restart: unless-stopped
-    volumes:
-      - ./core:/app
-      - ./frontend:/app/../frontend:ro
-      - static_volume:/app/staticfiles
-      - media_volume:/app/media
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-password}@postgres:5432/${DB_NAME:-groupbuy}
-      - REDIS_URL=redis://redis-api:6379/0
-      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
-      - DEBUG=${DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
-      - WEBSOCKET_URL=${WEBSOCKET_URL:-ws://chat-server:8765}
+      - PORT=8000
+      - RUST_LOG=${RUST_LOG:-info,groupbuy_api=debug}
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,7 +94,7 @@ services:
     networks:
       - api-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/users/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -148,6 +131,18 @@ services:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
     depends_on:
       - bot
+    networks:
+      - api-network
+
+  # React frontend
+  frontend-react:
+    build: ./frontend-react
+    container_name: groupbuy-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - core
     networks:
       - api-network
 
@@ -190,7 +185,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Nginx for API server (reverse proxy, static files)
+  # Nginx for API server (reverse proxy)
   nginx-api:
     image: nginx:alpine
     container_name: groupbuy-nginx-api
@@ -198,8 +193,6 @@ services:
     volumes:
       - ./infrastructure/nginx/nginx-api.conf:/etc/nginx/nginx.conf:ro
       - ./infrastructure/nginx/ssl:/etc/nginx/ssl:ro
-      - static_volume:/app/staticfiles:ro
-      - media_volume:/app/media:ro
     ports:
       - "80:80"
       - "443:443"
@@ -212,8 +205,6 @@ volumes:
   postgres_data:
   redis_api_data:
   redis_chat_data:
-  static_volume:
-  media_volume:
 
 networks:
   api-network:
