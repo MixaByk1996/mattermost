@@ -3,24 +3,44 @@ use sqlx::PgPool;
 
 use crate::models::chat::*;
 
-/// GET /api/chat/messages/?procurement=...
+/// GET /api/chat/messages/?procurement=...&user=...
 pub async fn list_messages(
     pool: web::Data<PgPool>,
     query: web::Query<MessageQuery>,
 ) -> HttpResponse {
-    let messages = if let Some(procurement_id) = query.procurement {
-        sqlx::query_as::<_, Message>(
-            "SELECT * FROM chat_messages WHERE procurement_id = $1 AND is_deleted = false ORDER BY created_at ASC",
-        )
-        .bind(procurement_id)
-        .fetch_all(pool.get_ref())
-        .await
-    } else {
-        sqlx::query_as::<_, Message>(
-            "SELECT * FROM chat_messages WHERE is_deleted = false ORDER BY created_at ASC LIMIT 100",
-        )
-        .fetch_all(pool.get_ref())
-        .await
+    let messages = match (query.procurement, query.user) {
+        (Some(procurement_id), Some(user_id)) => {
+            sqlx::query_as::<_, Message>(
+                "SELECT * FROM chat_messages WHERE procurement_id = $1 AND user_id = $2 AND is_deleted = false ORDER BY created_at ASC",
+            )
+            .bind(procurement_id)
+            .bind(user_id)
+            .fetch_all(pool.get_ref())
+            .await
+        }
+        (Some(procurement_id), None) => {
+            sqlx::query_as::<_, Message>(
+                "SELECT * FROM chat_messages WHERE procurement_id = $1 AND is_deleted = false ORDER BY created_at ASC",
+            )
+            .bind(procurement_id)
+            .fetch_all(pool.get_ref())
+            .await
+        }
+        (None, Some(user_id)) => {
+            sqlx::query_as::<_, Message>(
+                "SELECT * FROM chat_messages WHERE user_id = $1 AND is_deleted = false ORDER BY created_at ASC LIMIT 100",
+            )
+            .bind(user_id)
+            .fetch_all(pool.get_ref())
+            .await
+        }
+        (None, None) => {
+            sqlx::query_as::<_, Message>(
+                "SELECT * FROM chat_messages WHERE is_deleted = false ORDER BY created_at ASC LIMIT 100",
+            )
+            .fetch_all(pool.get_ref())
+            .await
+        }
     };
 
     match messages {

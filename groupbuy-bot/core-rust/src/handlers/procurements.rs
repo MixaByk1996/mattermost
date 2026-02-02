@@ -8,55 +8,49 @@ pub async fn list_procurements(
     pool: web::Data<PgPool>,
     query: web::Query<ProcurementQuery>,
 ) -> HttpResponse {
-    let mut sql = "SELECT * FROM procurements WHERE 1=1".to_string();
-    let mut params: Vec<String> = Vec::new();
+    // Build query dynamically based on provided filters
+    let mut conditions: Vec<String> = Vec::new();
+    let mut bind_values: Vec<String> = Vec::new();
     let mut idx = 0;
 
     if let Some(ref status) = query.status {
         idx += 1;
-        sql.push_str(&format!(" AND status = ${}", idx));
-        params.push(status.clone());
+        conditions.push(format!("status = ${}", idx));
+        bind_values.push(status.clone());
     }
     if let Some(ref city) = query.city {
         idx += 1;
-        sql.push_str(&format!(" AND city = ${}", idx));
-        params.push(city.clone());
+        conditions.push(format!("city = ${}", idx));
+        bind_values.push(city.clone());
+    }
+    if let Some(category_id) = query.category_id {
+        idx += 1;
+        conditions.push(format!("category_id = ${}", idx));
+        bind_values.push(category_id.to_string());
+    }
+    if let Some(organizer_id) = query.organizer_id {
+        idx += 1;
+        conditions.push(format!("organizer_id = ${}", idx));
+        bind_values.push(organizer_id.to_string());
     }
 
-    sql.push_str(" ORDER BY created_at DESC");
-
-    // Use a simpler approach - build different queries based on filters
-    let procurements = if let Some(ref status) = query.status {
-        if let Some(ref city) = query.city {
-            sqlx::query_as::<_, Procurement>(
-                "SELECT * FROM procurements WHERE status = $1 AND city = $2 ORDER BY created_at DESC",
-            )
-            .bind(status)
-            .bind(city)
-            .fetch_all(pool.get_ref())
-            .await
-        } else {
-            sqlx::query_as::<_, Procurement>(
-                "SELECT * FROM procurements WHERE status = $1 ORDER BY created_at DESC",
-            )
-            .bind(status)
-            .fetch_all(pool.get_ref())
-            .await
-        }
-    } else if let Some(ref city) = query.city {
-        sqlx::query_as::<_, Procurement>(
-            "SELECT * FROM procurements WHERE city = $1 ORDER BY created_at DESC",
-        )
-        .bind(city)
-        .fetch_all(pool.get_ref())
-        .await
+    let where_clause = if conditions.is_empty() {
+        String::new()
     } else {
-        sqlx::query_as::<_, Procurement>(
-            "SELECT * FROM procurements ORDER BY created_at DESC",
-        )
-        .fetch_all(pool.get_ref())
-        .await
+        format!(" WHERE {}", conditions.join(" AND "))
     };
+
+    let sql = format!(
+        "SELECT * FROM procurements{} ORDER BY created_at DESC",
+        where_clause
+    );
+
+    let mut q = sqlx::query_as::<_, Procurement>(&sql);
+    for val in &bind_values {
+        q = q.bind(val);
+    }
+
+    let procurements = q.fetch_all(pool.get_ref()).await;
 
     match procurements {
         Ok(procs) => {

@@ -1,5 +1,4 @@
 use wasm_bindgen::prelude::*;
-use serde::{Deserialize, Serialize};
 
 /// Validate phone number format (Russian phone number)
 #[wasm_bindgen]

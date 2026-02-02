@@ -39,6 +39,7 @@ pub struct PaymentStatusResponse {
     pub confirmation_url: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Transaction {
     pub id: i32,
