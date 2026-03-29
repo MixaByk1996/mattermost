@@ -76,6 +76,7 @@ const ModalController = makeAsyncComponent('ModalController', lazy(() => import(
 const AppBar = makeAsyncComponent('AppBar', lazy(() => import('components/app_bar/app_bar')));
 const ComponentLibrary = makeAsyncComponent('ComponentLibrary', lazy(() => import('components/component_library')));
 const PopoutController = makeAsyncComponent('PopoutController', lazy(() => import('components/popout_controller')));
+const GroupBuy = makeAsyncComponent('GroupBuy', lazy(() => import('components/groupbuy')));
 
 const Pluggable = makeAsyncPluggableComponent();
 
@@ -387,6 +388,10 @@ export default class Root extends React.PureComponent<Props, State> {
                     <LoggedInRoute
                         path={'/mfa'}
                         component={Mfa}
+                    />
+                    <Route
+                        path={'/groupbuy'}
+                        component={GroupBuy}
                     />
                     <LoggedInRoute
                         path={'/preparing-workspace'}
